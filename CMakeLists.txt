@@ -75,6 +75,9 @@ target_link_libraries(final_projeto
         FreeRTOS-Kernel-Heap4
         FreeRTOS-Kernel
         pico_lwip_http
+        pico_lwip_mbedtls
+        pico_mbedtls
+        pico_lwip_mqtt
         )
 
 pico_add_extra_outputs(final_projeto)
