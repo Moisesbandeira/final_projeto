@@ -38,7 +38,8 @@ pico_sdk_init()
 add_executable(final_projeto 
     final_projeto.c
     lib/Bh1750/bh1750.c
-    lib/Ssd1306/ssd1306.c )
+    lib/Ssd1306/ssd1306.c
+    lib/Aht10/aht10.c )
 
 pico_set_program_name(final_projeto "final_projeto")
 pico_set_program_version(final_projeto "0.1")
@@ -55,7 +56,7 @@ target_link_libraries(final_projeto
 target_include_directories(final_projeto PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
          ${CMAKE_CURRENT_LIST_DIR}/lib
-        ${CMAKE_CURRENT_LIST_DIR}/lib/Servo
+        ${CMAKE_CURRENT_LIST_DIR}/lib/Aht10
         ${CMAKE_CURRENT_LIST_DIR}/lib/Bh1750
         ${CMAKE_CURRENT_LIST_DIR}/lib/Ssd1306
 )
