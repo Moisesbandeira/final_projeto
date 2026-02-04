@@ -9,8 +9,13 @@
 */
 
 // Wi-Fi Pico W
+#include "lwip/dns.h"
+#include "lwip/netdb.h"
+#include "lwip/ip_addr.h"
 #include "pico/cyw43_arch.h"
 #include "lwipopts.h"
+#include "lwip/apps/mqtt.h"
+
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -50,6 +55,10 @@
 #define WIFI_SSID       "brisa-4338675"
 #define WIFI_PASSWORD   "abqkbrvg"
 
+// Configurações do Broker
+#define MQTT_BROKER "broker.emqx.io"
+#define MQTT_PORT 1883
+#define CLIENT_ID "mqttx_ad0e1b87"
 
 
 // ====== FreeRTOS Static Memory ======
@@ -95,36 +104,31 @@ int i2c_write(uint8_t addr, const uint8_t *data, uint16_t len);
 int i2c_read(uint8_t addr, uint8_t *data, uint16_t len);
 void delay_ms(uint32_t ms);
 
-// // Tarefa Wi-Fi
-// void task_wifi(void *pvParameters) 
-// {
-//     if (cyw43_arch_init()) 
-//     {
-//         printf("Falha ao inicializar Wi-Fi\n");
-//         vTaskDelete(NULL);
-//     }
+// Estrutura do cliente MQTT
+static mqtt_client_t *mqtt_client;
+static ip_addr_t broker_ip;
 
-//     cyw43_arch_enable_sta_mode();
-//     printf("Conectando ao Wi-Fi...\n");
+// Callback de conexão
+static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status) {
+    if (status == MQTT_CONNECT_ACCEPTED) {
+        printf("MQTT: Conectado com sucesso!\n");
+    } else {
+        printf("MQTT: Falha na conexão (status %d). Tentando novamente...\n", status);
+    }
+}
 
-//     if (cyw43_arch_wifi_connect_timeout_ms(
-//             WIFI_SSID, WIFI_PASSWORD,
-//             CYW43_AUTH_WPA2_AES_PSK, 30000) != 0) 
-//     {
-//         printf("Falha ao conectar no Wi-Fi\n");
-//     } 
-//     else 
-//     {
-//         printf("Wi-Fi conectado com sucesso!\n");
-//     }
-//     while (true) 
-//     {
-//         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-//         vTaskDelay(pdMS_TO_TICKS(500));
-//         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-//         vTaskDelay(pdMS_TO_TICKS(500));
-//     }
-// }
+// Função para publicar mensagem
+void publish_message(const char *topic, const char *payload) {
+    if (mqtt_client_is_connected(mqtt_client)) {
+        err_t err = mqtt_publish(mqtt_client, topic, payload, strlen(payload), 0, 0, NULL, NULL);
+        if (err == ERR_OK) {
+            printf("MQTT: Publicado em [%s]: %s\n", topic, payload);
+        }
+    } else {
+        printf("MQTT: Erro - Cliente não conectado\n");
+    }
+}
+
 int main() {
     stdio_init_all();
 
@@ -249,15 +253,34 @@ void task_wifi(void *pvParameters) {
     }
     cyw43_arch_enable_sta_mode();
     
+    printf("Conectando ao Wi-Fi...\n");
     if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000) == 0) {
         printf("Wi-Fi OK!\n");
+
+        // Inicializa cliente MQTT
+        mqtt_client = mqtt_client_new();
+        
+        // Resolve o IP do Broker DNS
+        printf("Resolvendo IP do Broker...\n");
+        err_t err = dns_gethostbyname(MQTT_BROKER, &broker_ip, NULL, NULL);
+        
+        // Nota: Em um código de produção, você usaria um callback para o DNS. 
+        // Aqui, forçamos uma espera curta para simplificar.
+        vTaskDelay(pdMS_TO_TICKS(2000)); 
+
+        struct mqtt_connect_client_info_t ci;
+        memset(&ci, 0, sizeof(ci));
+        ci.client_id = CLIENT_ID;
+        ci.keep_alive = 60;
+
+        mqtt_client_connect(mqtt_client, &broker_ip, MQTT_PORT, mqtt_connection_cb, NULL, &ci);
     }
 
     while (true) {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
         vTaskDelay(pdMS_TO_TICKS(100));
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 // ================= TAREFA DE PROCESSAMENTO =================
@@ -266,31 +289,28 @@ void task_button_processor(void *pvParameters) {
     button_event_t event;
     
     while (true) {
-        // Fica bloqueado esperando um evento de botão na fila
         if (xQueueReceive(xButtonEventQueue, &event, portMAX_DELAY)) {
             
-            // Ativa o Buzzer (feedback sonoro)
             pwm_set_gpio_level(BUZZER_PIN, 2048); 
             
             switch (event) {
                 case EVENT_FOOD:
-                    printf("[MQTT] Enviando: Quero Comida\n");
-                    // Futuramente: mqtt_publish("pico/ajuda", "comida");
+                    publish_message("quarto/comer", "Solicitação: Comida");
                     break;
                 case EVENT_WATER:
-                    printf("[MQTT] Enviando: Quero Água\n");
+                    publish_message("quarto/beber", "Solicitação: Agua");
                     break;
                 case EVENT_BATHROOM:
-                    printf("[MQTT] Enviando: Preciso ir ao Banheiro\n");
+                    publish_message("quarto/dormir", "Solicitação: Banheiro/Dormir");
                     break;
                 case EVENT_PLAY:
-                    printf("[MQTT] Enviando: Quero Brincar\n");
+                    publish_message("quarto/brincar", "Solicitação: Brincar");
                     break;
                 default:
                     break;
             }
 
-            vTaskDelay(pdMS_TO_TICKS(500)); // Duração do bip
+            vTaskDelay(pdMS_TO_TICKS(500));
             pwm_set_gpio_level(BUZZER_PIN, 0);
         }
     }
