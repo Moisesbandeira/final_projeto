@@ -3,8 +3,8 @@
 
 // Como estamos usando FreeRTOS, não queremos o modo NO_SYS
 #define NO_SYS                      0
-#define LWIP_SOCKET                 1
-#define LWIP_NETCONN                1
+#define LWIP_SOCKET                 0
+#define LWIP_NETCONN                0
 
 // --- ADICIONE ESTAS LINHAS PARA CORRIGIR O ERRO DE COMPILAÇÃO ---
 #define LWIP_NETIF_HOSTNAME         1
@@ -25,6 +25,16 @@
 #define DEFAULT_UDP_RECVMBOX_SIZE   8
 #define DEFAULT_RAW_RECVMBOX_SIZE   8
 #define DEFAULT_ACCEPTMBOX_SIZE     8
+
+// --- HABILITAR DNS E PROTOCOLOS NECESSÁRIOS ---
+#define LWIP_DNS                    1
+#define LWIP_UDP                    1  // DNS requer UDP
+#define LWIP_TCP                    1  // MQTT requer TCP
+#define LWIP_IGMP                   1  // Bom para descoberta de rede
+
+// Configurações extras de DNS para estabilidade
+#define DNS_TABLE_SIZE              2
+#define DNS_MAX_RETRANSMISSION      4
 
 // Aumenta o número de conexões TCP simultâneas permitidas
 #ifndef MEMP_NUM_TCP_PCB

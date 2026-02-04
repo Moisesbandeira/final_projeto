@@ -52,11 +52,14 @@
 
 
 // ================= CONFIGURAÇÕES =================
-#define WIFI_SSID       "brisa-4338675"
-#define WIFI_PASSWORD   "abqkbrvg"
+#define WIFI_SSID       "WI-FI_P4"
+#define WIFI_PASSWORD   "thais_p4"
 
 // Configurações do Broker
 #define MQTT_BROKER "broker.emqx.io"
+#ifdef MQTT_PORT
+#undef MQTT_PORT
+#endif
 #define MQTT_PORT 1883
 #define CLIENT_ID "mqttx_ad0e1b87"
 
