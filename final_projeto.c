@@ -38,12 +38,17 @@
 #define I2C_SDA1 14
 #define I2C_SCL1 15
 
-
+// --- Novas Definições ---
+#define BUZZER_PIN 10
+#define BUTTON1_PIN 6  // Comida
+#define BUTTON2_PIN 5  // Água
+#define BUTTON3_PIN 19  // Banheiro
+#define BUTTON4_PIN 20  // Brincar
 
 
 // ================= CONFIGURAÇÕES =================
-#define WIFI_SSID       "Gesilane"
-#define WIFI_PASSWORD   "bruxxf6d"
+#define WIFI_SSID       "brisa-4338675"
+#define WIFI_PASSWORD   "abqkbrvg"
 
 
 
@@ -66,10 +71,23 @@ typedef struct {
     float lux;
 } sensor_data_t;
 
+// Enumeração para identificar os eventos dos botões
+typedef enum {
+    EVENT_NONE,
+    EVENT_FOOD,
+    EVENT_WATER,
+    EVENT_BATHROOM,
+    EVENT_PLAY
+} button_event_t;
+
 // Handle da Fila
 QueueHandle_t xSensorQueue;
+QueueHandle_t xButtonEventQueue;
 
 // --- Protótipos ---
+void task_button_processor(void *pvParameters);
+void gpio_callback(uint gpio, uint32_t events);
+void init_hardware_buttons();
 void task_wifi(void *pvParameters);
 void task_sensors(void *pvParameters);
 void task_display(void *pvParameters);
@@ -140,6 +158,16 @@ int main() {
     ssd1306_draw_string(32, 0, "Sensor AHT10");
     ssd1306_show();
 
+
+    xButtonEventQueue = xQueueCreate(10, sizeof(button_event_t));
+
+    if (xButtonEventQueue != NULL) {
+         init_hardware_buttons();
+    
+    // Tarefa que processará os botões e futuramente enviará MQTT
+         xTaskCreate(task_button_processor, "Button_Task", 2048, NULL, 3, NULL);
+    }
+
     // Criação da Fila (Suporta 5 medições)
     xSensorQueue = xQueueCreate(5, sizeof(sensor_data_t));
 
@@ -201,13 +229,13 @@ void task_display(void *pvParameters) {
             ssd1306_clear();
             ssd1306_draw_string(32, 0, "MONITOR");
             
-            snprintf(str, sizeof(str), "T: %.1f C", received_data.temperatura);
+            snprintf(str, sizeof(str), "Temp: %.1f C", received_data.temperatura);
             ssd1306_draw_string(0, 16, str);
             
-            snprintf(str, sizeof(str), "U: %.1f %%", received_data.umidade);
+            snprintf(str, sizeof(str), "Umi: %.1f %%", received_data.umidade);
             ssd1306_draw_string(0, 32, str);
             
-            snprintf(str, sizeof(str), "L: %.1f lx", received_data.lux);
+            snprintf(str, sizeof(str), "Luz: %.1f lx", received_data.lux);
             ssd1306_draw_string(0, 48, str);
             
             ssd1306_show();
@@ -232,7 +260,87 @@ void task_wifi(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+// ================= TAREFA DE PROCESSAMENTO =================
 
+void task_button_processor(void *pvParameters) {
+    button_event_t event;
+    
+    while (true) {
+        // Fica bloqueado esperando um evento de botão na fila
+        if (xQueueReceive(xButtonEventQueue, &event, portMAX_DELAY)) {
+            
+            // Ativa o Buzzer (feedback sonoro)
+            pwm_set_gpio_level(BUZZER_PIN, 2048); 
+            
+            switch (event) {
+                case EVENT_FOOD:
+                    printf("[MQTT] Enviando: Quero Comida\n");
+                    // Futuramente: mqtt_publish("pico/ajuda", "comida");
+                    break;
+                case EVENT_WATER:
+                    printf("[MQTT] Enviando: Quero Água\n");
+                    break;
+                case EVENT_BATHROOM:
+                    printf("[MQTT] Enviando: Preciso ir ao Banheiro\n");
+                    break;
+                case EVENT_PLAY:
+                    printf("[MQTT] Enviando: Quero Brincar\n");
+                    break;
+                default:
+                    break;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(500)); // Duração do bip
+            pwm_set_gpio_level(BUZZER_PIN, 0);
+        }
+    }
+}
+
+// ================= TRATAMENTO DE INTERRUPÇÃO (ISR) =================
+
+void gpio_callback(uint gpio, uint32_t events) {
+    static uint32_t last_interrupt_time = 0;
+    uint32_t current_time = to_ms_since_boot(get_absolute_time());
+    
+    // Debounce de 250ms
+    if (current_time - last_interrupt_time < 250) return;
+    last_interrupt_time = current_time;
+
+    button_event_t event = EVENT_NONE;
+
+    if (gpio == BUTTON1_PIN) event = EVENT_FOOD;
+    else if (gpio == BUTTON2_PIN) event = EVENT_WATER;
+    else if (gpio == BUTTON3_PIN) event = EVENT_BATHROOM;
+    else if (gpio == BUTTON4_PIN) event = EVENT_PLAY;
+
+    if (event != EVENT_NONE) {
+        // Envia para a fila a partir de uma interrupção (FromISR)
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xQueueSendFromISR(xButtonEventQueue, &event, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+// ================= CONFIGURAÇÃO DE HARDWARE =================
+
+void init_hardware_buttons() {
+    // Configura Buzzer
+    gpio_set_function(BUZZER_PIN, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER_PIN);
+    pwm_config config = pwm_get_default_config();
+    pwm_init(slice_num, &config, true);
+    pwm_set_gpio_level(BUZZER_PIN, 0);
+
+    // Configura Botões com Pull-up e Interrupção
+    const uint buttons[] = {BUTTON1_PIN, BUTTON2_PIN, BUTTON3_PIN, BUTTON4_PIN};
+    
+    for(int i=0; i<4; i++) {
+        gpio_init(buttons[i]);
+        gpio_set_dir(buttons[i], GPIO_IN);
+        gpio_pull_up(buttons[i]);
+        // Habilita interrupção na descida (ao pressionar)
+        gpio_set_irq_enabled_with_callback(buttons[i], GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+    }
+}
 // ================= CALLBACKS I2C =================
 int i2c_write(uint8_t addr, const uint8_t *data, uint16_t len) {
     return i2c_write_blocking(I2C_PORT0, addr, data, len, false) < 0 ? -1 : 0;
