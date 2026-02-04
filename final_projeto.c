@@ -89,19 +89,22 @@ int main() {
             printf("Falha na leitura dos dados!\n");
         }
         ssd1306_clear();
-
+        // Organiza labels e valores em colunas (label à esquerda, valor à direita)
         char temp_str[16];
-        snprintf(temp_str, sizeof(temp_str), "%.2f C", temp);
-        ssd1306_draw_string(85, 30, temp_str);
-        ssd1306_draw_string(0, 50, "Umidade");
         char hum_str[16];
-        snprintf(hum_str, sizeof(hum_str), "%.2f %%", hum);
-        ssd1306_draw_string(85, 50, hum_str);
-        ssd1306_show();
         char lux_str[16];
-        snprintf(lux_str, sizeof(lux_str), "%.2f lumens", lux);
-        ssd1306_draw_string(0, 60, "Luz:");
-        ssd1306_draw_string(85, 60, lux_str);
+        snprintf(temp_str, sizeof(temp_str), "%.2f C", temp);
+        snprintf(hum_str, sizeof(hum_str), "%.2f %%", hum);
+        snprintf(lux_str, sizeof(lux_str), "%.2f lx", lux);
+        // Título (opcional)
+        ssd1306_draw_string(32, 0, "Sensor AHT10");
+        // Linhas de dados (Y: 16, 32, 48)
+        ssd1306_draw_string(0, 16, "Temperatura:");
+        ssd1306_draw_string(90, 16, temp_str);
+        ssd1306_draw_string(0, 32, "Umidade:");
+        ssd1306_draw_string(90, 32, hum_str);
+        ssd1306_draw_string(0, 48, "Luz:");
+        ssd1306_draw_string(90, 48, lux_str);
         ssd1306_show();
 
         sleep_ms(1000);
