@@ -33,6 +33,10 @@ project(final_projeto C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# Configuração do FreeRTOS
+set(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/FreeRTOS-Kernel)
+include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake) 
+
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(final_projeto 
@@ -67,6 +71,10 @@ target_link_libraries(final_projeto
         hardware_i2c
         hardware_flash
         hardware_sync
+        pico_cyw43_arch_lwip_sys_freertos  # Versão correta para FreeRTOS + WiFi
+        FreeRTOS-Kernel-Heap4
+        FreeRTOS-Kernel
+        pico_lwip_http
         )
 
 pico_add_extra_outputs(final_projeto)

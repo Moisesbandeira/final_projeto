@@ -1,15 +1,30 @@
 /* -------------------------------------------------------------------------------------------------------------------------------------
-/ Projeto: Sensor AHT10 com OLED SSD1306
+/ Projeto: Paineis de Comunicação alternativa com sensores ambientais.
 / Descrição: Este código lê a temperatura e umidade do sensor AHT10 e exibe os dados em um display OLED SSD1306 e
 / uma mensagem de alerta quando a umidade chega a 70% ou a temperatura fica abaixo de 20 °C.
 / Bibliotecas: Aht10, Ssd1306
 / Autor: MOisés Lourenço
-/ Data de Criação: 21/09/2025
+/ Data de Criação: 04/02/2026
 /----------------------------------------------------------------------------------------------------------------------------------------
 */
-#include <stdio.h>
+
+// Wi-Fi Pico W
+#include "pico/cyw43_arch.h"
+#include "lwipopts.h"
+
+// FreeRTOS
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "event_groups.h"
+
+// Raspberry Pi Pico
 #include "pico/stdlib.h"
+#include "hardware/pwm.h"
+#include "hardware/clocks.h"
 #include "hardware/i2c.h"
+
+// sensores e display
 #include "aht10.h"
 #include "ssd1306.h"
 #include "bh1750.h"
@@ -23,11 +38,59 @@
 #define I2C_SDA1 14
 #define I2C_SCL1 15
 
+// ================= CONFIGURAÇÕES =================
+#define WIFI_SSID       "Gesilane"
+#define WIFI_PASSWORD   "bruxxf6d"
+
+
+// ====== FreeRTOS Static Memory ======
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize) {
+    static StaticTask_t xIdleTaskTCB;
+    static StackType_t uxIdleTaskStack[configMINIMAL_STACK_SIZE];
+    *ppxIdleTaskTCBBuffer = &xIdleTaskTCB; *ppxIdleTaskStackBuffer = uxIdleTaskStack; *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
+}
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize) {
+    static StaticTask_t xTimerTaskTCB;
+    static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+    *ppxTimerTaskTCBBuffer = &xTimerTaskTCB; *ppxTimerTaskStackBuffer = uxTimerTaskStack; *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+
+
 // assinatura  das funções I2C
 int i2c_write(uint8_t addr, const uint8_t *data, uint16_t len);
 int i2c_read(uint8_t addr, uint8_t *data, uint16_t len);
 void delay_ms(uint32_t ms);
 
+// Tarefa Wi-Fi
+void task_wifi(void *pvParameters) 
+{
+    if (cyw43_arch_init()) 
+    {
+        printf("Falha ao inicializar Wi-Fi\n");
+        vTaskDelete(NULL);
+    }
+
+    cyw43_arch_enable_sta_mode();
+    printf("Conectando ao Wi-Fi...\n");
+
+    if (cyw43_arch_wifi_connect_timeout_ms(
+            WIFI_SSID, WIFI_PASSWORD,
+            CYW43_AUTH_WPA2_AES_PSK, 30000) != 0) 
+    {
+        printf("Falha ao conectar no Wi-Fi\n");
+    } 
+    else 
+    {
+        printf("Wi-Fi conectado com sucesso!\n");
+    }
+    while (true) 
+    {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
 int main() {
     stdio_init_all();
 
@@ -80,6 +143,11 @@ int main() {
         while (1) sleep_ms(1000);
     }
 
+    // Cria tarefa Wi-Fi e inicia Agedador de tarefas
+   // xTaskCreate(task_wifi, "WiFi_Task", 1024, NULL, 1, NULL);
+///   vTaskStartScheduler();
+ ///  while(1) {}
+    
     while (1) {
         float temp, hum, lux;
         if (AHT10_ReadTemperatureHumidity(&aht10, &temp, &hum)) {
@@ -97,7 +165,7 @@ int main() {
         snprintf(hum_str, sizeof(hum_str), "%.2f %%", hum);
         snprintf(lux_str, sizeof(lux_str), "%.2f lx", lux);
         // Título (opcional)
-        ssd1306_draw_string(32, 0, "Sensor AHT10");
+        ssd1306_draw_string(32, 0, "Sensores");
         // Linhas de dados (Y: 16, 32, 48)
         ssd1306_draw_string(0, 16, "Temperatura:");
         ssd1306_draw_string(90, 16, temp_str);
