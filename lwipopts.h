@@ -10,6 +10,20 @@
 #define LWIP_NETIF_HOSTNAME         1
 #define LWIP_DHCP                   1
 // -------------------------------------------------------------
+#define LWIP_ALTCP               1
+#define LWIP_ALTCP_TLS           0
+#define MQTT_OUTPUT_RINGBUF_SIZE 512
+
+// Aumenta o pool de timeouts do sistema (o padrão costuma ser 4 ou 5)
+#undef MEMP_NUM_SYS_TIMEOUT
+#define MEMP_NUM_SYS_TIMEOUT   12
+
+// Garante que o MQTT e o TCP tenham slots suficientes
+#undef MEMP_NUM_TCP_PCB
+#define MEMP_NUM_TCP_PCB       8
+
+// Importante para projetos com FreeRTOS
+#define PICO_LWIP_MAX_TIMEOUTS 12
 
 #define LWIP_TIMEVAL_PRIVATE        0
 
