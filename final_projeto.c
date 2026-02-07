@@ -169,21 +169,41 @@ void task_wifi(void *pvParameters) {
 // ================= TAREFA BOTÕES (COM DADOS SENSORES) =================
 void task_button_processor(void *pvParameters) {
     button_event_t event;
-    char payload[100];
-    
+    char payload[50];
+     char payload1[50];
+      char payload2[50];
     while (true) {
         if (xQueueReceive(xButtonEventQueue, &event, portMAX_DELAY)) {
             pwm_set_gpio_level(BUZZER_PIN, 2048); 
 
-            // Formata os dados dos sensores no payload
-            snprintf(payload, sizeof(payload), "Temp:%.1fC Umi:%.1f%% Lux:%.1f", 
-                     last_readings.temperatura, last_readings.umidade, last_readings.lux);
-            
+          snprintf(payload, sizeof(payload), "%.1f", last_readings.temperatura);
+          snprintf(payload1, sizeof(payload1), "%.1f", last_readings.umidade);
+          snprintf(payload2, sizeof(payload2), "%.1f", last_readings.lux);
             switch (event) {
-                case EVENT_FOOD:     publish_message("quarto/comer", payload); break;
-                case EVENT_WATER:    publish_message("quarto/beber", payload); break;
-                case EVENT_BATHROOM: publish_message("quarto/dormir", payload); break;
-                case EVENT_PLAY:     publish_message("quarto/brincar", payload); break;
+                case EVENT_FOOD:     
+                    publish_message("quarto/beber", "beber");
+                    publish_message("quarto/temperatura", payload);
+                    publish_message("quarto/umidade", payload1);
+                    publish_message("quarto/lux", payload2);
+                    break;
+                case EVENT_WATER:
+                    publish_message("quarto/comer", "comer");
+                    publish_message("quarto/temperatura", payload);
+                    publish_message("quarto/umidade", payload1);
+                    publish_message("quarto/lux", payload2);
+                    break;
+                case EVENT_BATHROOM: 
+                    publish_message("quarto/brincar", "brincar");
+                   publish_message("quarto/temperatura", payload);
+                    publish_message("quarto/umidade", payload1);
+                    publish_message("quarto/lux", payload2);
+                    break;
+                case EVENT_PLAY:
+                    publish_message("quarto/dormir", "dormir");
+                    publish_message("quarto/temperatura", payload);
+                    publish_message("quarto/umidade", payload1);
+                    publish_message("quarto/lux", payload2);
+                    break;
                 default: break;
             }
 
