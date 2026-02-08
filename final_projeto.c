@@ -41,10 +41,10 @@
 #define I2C_SCL1 15
 
 #define BUZZER_PIN 10
-#define BUTTON1_PIN 6  
-#define BUTTON2_PIN 5  
-#define BUTTON3_PIN 19 
-#define BUTTON4_PIN 20 
+#define BUTTON1_PIN 18   
+#define BUTTON2_PIN 19
+#define BUTTON3_PIN 20 
+#define BUTTON4_PIN 4 
 
 // ====== VARIÁVEIS GLOBAIS E ESTRUTURAS ======
 typedef struct {
