@@ -25,8 +25,8 @@
 #include "bh1750.h"
 
 // ================= CONFIGURAÇÕES =================
-#define WIFI_SSID       "Daniel"
-#define WIFI_PASSWORD   "Samuel02"
+#define WIFI_SSID       "moto g34 5G"
+#define WIFI_PASSWORD   "yreh2364"
 #define MQTT_BROKER     "broker.emqx.io"
 #ifndef MQTT_PORT
 #define MQTT_PORT 1883
