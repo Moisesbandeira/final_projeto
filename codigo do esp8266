@@ -1,0 +1,76 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
+// --- Configurações Wi-Fi ---
+const char* ssid = "Daniel";
+const char* password = "Samuel02";
+
+// --- Configurações MQTT ---
+const char* mqtt_broker = "broker.hivemq.com";
+const char* client_id = "esp8266_moises_002";
+
+// --- Pinos dos Botões ---
+const int BTN_BEBER   = D1; 
+const int BTN_COMER   = D2;
+const int BTN_BRINCAR = D3;
+const int BTN_DORMIR  = D4;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup_wifi() {
+  delay(10);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect(client_id)) {
+      // Conectado
+    } else {
+      delay(5000);
+    }
+  }
+}
+
+void setup() {
+  // Configura os pinos como entrada com Pull-up interno
+  pinMode(BTN_BEBER, INPUT_PULLUP);
+  pinMode(BTN_COMER, INPUT_PULLUP);
+  pinMode(BTN_BRINCAR, INPUT_PULLUP);
+  pinMode(BTN_DORMIR, INPUT_PULLUP);
+
+  setup_wifi();
+  client.setServer(mqtt_broker, 1883);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  // Lógica de leitura dos botões (aciona quando o pino vai para LOW)
+  if (digitalRead(BTN_BEBER) == LOW) {
+    client.publish("quarto/agua", "agua");
+    delay(500); // Debounce simples
+  }
+  
+  if (digitalRead(BTN_COMER) == LOW) {
+    client.publish("quarto/estudar", "estudar");
+    delay(500);
+  }
+
+  if (digitalRead(BTN_BRINCAR) == LOW) {
+    client.publish("quarto/banheiro", "banheiro");
+    delay(500);
+  }
+
+  if (digitalRead(BTN_DORMIR) == LOW) {
+    client.publish("quarto/escola", "escola");
+    delay(500);
+  }
+}
